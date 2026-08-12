@@ -528,8 +528,12 @@ Les sept étapes du projet sont réalisées et commitées séparément. L'applic
   recherche principale et tags se combinent.
 
 Point volontairement non traité à ce stade : la persistance des critères de recherche dans
-l'URL, présentée comme optionnelle (« Allez plus loin ») dans le README. Elle est traitée
-à l'étape 9.
+l'URL, présentée comme optionnelle (« Allez plus loin ») dans le README. Elle a ensuite
+été demandée et fait l'objet de l'étape 9.
+
+Les étapes 8 et 9 qui suivent ne font pas partie des sept étapes du README : elles
+répondent à deux demandes complémentaires formulées après la livraison — le passage du
+projet en JavaScript, et la persistance des critères de recherche dans l'URL.
 
 ---
 
@@ -590,3 +594,100 @@ des assertions `as`.
   sur des modules introuvables (les `.ts` voisins ayant, eux, bien été supprimés). Corrigé
   en utilisant `Remove-Item -LiteralPath`, puis en supprimant le `tsconfig.json` et le
   `next-env.d.ts` recréés automatiquement.
+
+---
+
+## Étape 9 — Persistance des critères de recherche dans l'URL
+
+### Analyse de la demande
+
+Réaliser l'option « Allez plus loin » de l'étape 6 : faire persister les critères de
+recherche sélectionnés en les passant à l'URL. Concrètement, une URL doit pouvoir être
+partagée ou rechargée en retrouvant la même recherche.
+
+### Analyse de l'état du code source actuel
+
+`RecipeExplorer` détenait les deux critères (`query` et `selectedTags`) uniquement en état
+React local, initialisés à vide. La page d'accueil était un Server Component statique qui
+ne lisait aucun paramètre d'URL.
+
+### Deux approches envisagées
+
+1. **Tout côté client** : lire les paramètres avec `useSearchParams()`. Ce hook force
+   Next.js à basculer la page en rendu client sous une frontière `<Suspense>` ; le HTML
+   initial ne contiendrait donc ni bannière ni recettes, ce qui dégraderait le premier
+   affichage et le référencement.
+2. **Lecture serveur, écriture client** : la page lit la prop `searchParams`, filtre donc
+   dès le rendu serveur, et le composant client remet les critères dans la barre
+   d'adresse avec `window.history.replaceState`.
+
+C'est la seconde qui a été retenue : le HTML renvoyé pour une URL partagée est déjà
+filtré. La documentation embarquée de Next.js 16
+(`01-getting-started/04-linking-and-navigating.md`) confirme que `pushState` et
+`replaceState` natifs sont intégrés au routeur et n'entraînent aucune navigation — donc
+aucun aller-retour serveur à chaque frappe, contrairement à `router.replace()`.
+
+### Actions menées
+
+1. **`lib/search.js`** :
+   - `QUERY_PARAM` (`q`) ;
+   - `readTagsFromParams(params, recipes)` : lit `ingredients`, `appliances` et
+     `ustensils` (paramètres répétables), normalise, dédoublonne, et surtout **ne
+     conserve que les valeurs réellement présentes dans le jeu de données**, pour qu'une
+     URL saisie à la main ne puisse pas injecter un tag fantôme qui viderait la page ;
+   - `buildSearchParams(query, tags)` : opération inverse. Le terme de recherche n'est
+     écrit qu'à partir de 3 caractères, puisqu'en deçà il ne filtre pas.
+2. **`app/page.jsx`** : `await props.searchParams`, puis passage de `initialQuery` et
+   `initialTags` à `RecipeExplorer`.
+3. **`components/RecipeExplorer.jsx`** : états initialisés depuis ces props, et effet qui
+   recopie les critères dans l'URL via `window.history.replaceState` (avec comparaison
+   préalable pour ne rien écrire quand l'URL est déjà à jour). La valeur **débouncée** est
+   utilisée : la barre d'adresse ne bouge donc pas à chaque caractère.
+
+### Conséquences assumées
+
+- La page d'accueil passe de statique (`○`) à dynamique (`ƒ`) dans la sortie de
+  `next build`, puisqu'elle dépend désormais de la requête. Les 50 pages de recettes
+  restent prégénérées (`●`). C'est le prix à payer pour qu'une URL partagée soit servie
+  déjà filtrée.
+- `replaceState` remplace l'entrée courante au lieu d'en ajouter une : le bouton
+  « Précédent » ne rejoue pas les filtres un à un, il quitte la page. Revenir dessus
+  restaure l'URL, donc les critères. C'est un comportement volontaire — empiler une entrée
+  d'historique par frappe serait inutilisable.
+- L'effet réécrit l'URL sous forme canonique : d'éventuels paramètres étrangers à la
+  recherche (par exemple `utm_source`) seraient supprimés.
+
+### Tests effectués
+
+Rendu serveur vérifié directement en HTTP, sur le HTML brut (donc avant tout JavaScript) :
+
+| URL                              | Cartes rendues |
+| -------------------------------- | -------------- |
+| `/`                              | 50             |
+| `/?ingredients=lait+de+coco`     | 3              |
+| `/?q=chocolat&appliances=four`   | 4              |
+| `/?ingredients=zzz-inexistant`   | 50 (tag ignoré)|
+
+Nouveau scénario Playwright, 16 contrôles, tous au vert :
+
+| Vérification                                                    | Résultat                              |
+| ---------------------------------------------------------------- | ------------------------------------- |
+| URL propre sans critère                                          | `/`                                   |
+| Sélection d'un tag écrite dans l'URL                             | `/?ingredients=lait de coco`          |
+| Recherche de moins de 3 caractères non écrite                    | OK                                    |
+| Terme de recherche écrit dans l'URL, cumulé au tag               | `/?q=poulet&ingredients=lait de coco` |
+| Rechargement : URL, résultats, champ de saisie et pastille       | tous restaurés                        |
+| URL partagée filtrée dès le premier HTML                         | 4 recettes                            |
+| Tag inconnu ignoré et retiré de l'URL                            | 50 recettes, `/`                      |
+| Effacement des critères : URL nettoyée                           | `/`                                   |
+| Erreurs console                                                  | aucune                                |
+
+Les deux scénarios des étapes 6 et 7 ont été rejoués : aucune régression
+(**43 contrôles au vert au total**). `npx eslint .` et `npm run build` passent.
+
+### Problèmes rencontrés
+
+- Trois assertions en échec au premier passage, dues au **test** et non au code :
+  `URLSearchParams` encode les espaces en `+`, que `decodeURIComponent` ne reconvertit
+  pas. Les URL produites par l'application (`?ingredients=lait+de+coco`) étaient
+  correctes ; c'est le comparateur du scénario qui a été corrigé.

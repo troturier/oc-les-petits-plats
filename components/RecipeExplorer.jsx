@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import FilterDropdown from "@/components/FilterDropdown";
 import Hero from "@/components/Hero";
 import MainSearchBar from "@/components/MainSearchBar";
@@ -10,7 +10,7 @@ import {
   CATEGORY_LABELS,
   FILTER_CATEGORIES,
   MIN_QUERY_LENGTH,
-  NO_TAGS,
+  buildSearchParams,
   collectOptions,
   filterRecipes,
   indexRecipes,
@@ -22,14 +22,32 @@ const SEARCH_DEBOUNCE_MS = 200;
 
 /**
  * Owns the whole search state: the main search input and the advanced tags.
+ * The criteria are seeded from the URL by the page and mirrored back into it.
  *
- * @param {{ recipes: import("@/lib/recipes").Recipe[] }} props
+ * @param {object} props
+ * @param {import("@/lib/recipes").Recipe[]} props.recipes
+ * @param {string} props.initialQuery
+ * @param {import("@/lib/search").SelectedTags} props.initialTags
  */
-export default function RecipeExplorer({ recipes }) {
-  const [query, setQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState(NO_TAGS);
+export default function RecipeExplorer({ recipes, initialQuery, initialTags }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [selectedTags, setSelectedTags] = useState(initialTags);
 
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
+
+  // Mirror the criteria into the address bar so the search can be shared or
+  // reloaded. `replaceState` keeps the router in sync without navigating, which
+  // would otherwise re-run the server component on every keystroke.
+  useEffect(() => {
+    const search = buildSearchParams(debouncedQuery, selectedTags);
+    const url = search
+      ? `${window.location.pathname}?${search}`
+      : window.location.pathname;
+
+    if (url !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [debouncedQuery, selectedTags]);
 
   // Normalizing the dataset once keeps every later keystroke cheap.
   const entries = useMemo(() => indexRecipes(recipes), [recipes]);
