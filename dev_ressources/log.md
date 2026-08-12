@@ -83,3 +83,85 @@ Le travail reprend donc à la clôture de l'étape 1, puis se poursuit à l'éta
   produit, aucun travail n'a été perdu ni dupliqué.
 - Le fichier `dev_ressources/` étant globalement ignoré par Git, l'exception
   `!/dev_ressources/log.md` déjà présente dans `.gitignore` a été conservée telle quelle.
+
+---
+
+## Étape 2 — Intégration du design de la page d'accueil
+
+### Analyse de la demande
+
+Analyser les maquettes, découper l'interface en composants (bannière, barre de recherche,
+sélecteurs de tags, cartes de recette) puis intégrer ces composants dans la page
+d'accueil. La carte de recette doit être créée dès cette étape avec des **données
+statiques**, afin de n'avoir plus qu'à y brancher le JSON à l'étape 3.
+
+### Analyse de l'état du code source actuel
+
+`app/page.tsx`, `app/layout.tsx` et `app/globals.css` étaient encore ceux générés par
+`create-next-app` (logo Next.js, liens vers Vercel, thème clair/sombre par défaut).
+Aucun composant, aucun type, aucune police du projet n'existait.
+
+### Découpage retenu
+
+| Composant                   | Rôle                                                         |
+| --------------------------- | ------------------------------------------------------------ |
+| `SiteHeader`                | Logo, positionné en absolu au-dessus de la bannière           |
+| `SiteFooter`                | Bandeau noir de copyright                                     |
+| `Hero`                      | Bannière : image, voile noir 30 %, titre ; accepte un enfant   |
+| `MainSearchBar`             | Barre de recherche principale                                  |
+| `FilterDropdown`            | Sélecteur de recherche avancée (état fermé)                    |
+| `RecipeCard`                | Carte de recette (image, badge temps, description, ingrédients)|
+| `SearchIcon`                | Icône loupe réutilisée par la barre et les sélecteurs          |
+
+`Hero` reçoit la barre de recherche via `children` : la bannière reste ainsi un Server
+Component alors que la barre deviendra un Client Component à l'étape 7.
+
+### Actions menées
+
+1. `app/globals.css` : définition des tokens de design Tailwind v4 (`@theme`) issus de
+   `figma.css` — couleurs `brand-yellow`, `brand-black`, `brand-grey`,
+   `brand-background`, polices `--font-display` / `--font-sans`, ombre `shadow-card`.
+2. `app/layout.tsx` : chargement des polices Google **Anton** (titres) et **Manrope**
+   (textes) via `next/font/google`, passage de `lang="fr"`, métadonnées du site,
+   structure `SiteHeader` / `main` / `SiteFooter` en colonne pleine hauteur.
+3. Création de `lib/types.ts` (types `Recipe` et `RecipeIngredient`) et de
+   `lib/format.ts` (`formatQuantity`).
+4. Création des composants listés ci-dessus dans `components/`.
+5. `app/page.tsx` : assemblage bannière + barre de filtres + compteur de recettes +
+   grille de cartes, alimenté par une recette statique.
+6. Suppression des cinq SVG de démarrage (`next.svg`, `vercel.svg`, `file.svg`,
+   `globe.svg`, `window.svg`) devenus orphelins après la réécriture de `app/page.tsx`.
+
+### Choix d'implémentation
+
+- **Quantités** : la maquette colle l'unité au nombre pour les unités courtes
+  (`400ml`, `25cl`) mais l'espace pour les unités longues (`1 cuillère à soupe`).
+  `formatQuantity` reproduit ce comportement et affiche `-` quand la recette ne fournit
+  aucune quantité, comme sur la maquette.
+- **Hauteur des cartes** : la maquette fige les cartes à 731 px avec un
+  `overflow-y: scroll`. Ce choix produit une barre de défilement interne peu agréable ;
+  les cartes s'adaptent donc à leur contenu et la description est tronquée à quatre
+  lignes (`line-clamp-4`), ce qui donne un rendu visuellement identique sans scroll.
+- **Grille** : gouttière horizontale de 48 px et verticale de 66 px, mesurées sur les
+  positions absolues des cartes dans `figma.css` (`left: 102 / 530 / 958`,
+  `top: 843 / 1640`).
+
+### Tests effectués
+
+- `npm run build` : compilation réussie, aucune erreur TypeScript.
+- `npx eslint .` : aucun avertissement.
+- `npm run dev` puis capture de la page en Chrome headless (1440 × 2600) et comparaison
+  visuelle avec `dev_ressources/figma/Home.png` : bannière, titre jaune, barre de
+  recherche, trois sélecteurs, compteur et carte conformes.
+- Deux écarts détectés lors de cette comparaison et corrigés : gouttière de grille
+  (62 px → 48 px) et largeur maximale du titre (954 px → 890 px, soit les 61,8 % de la
+  maquette) pour retrouver la même césure.
+
+### Problèmes rencontrés
+
+- La maquette `Home search active.png` ne correspond pas à son nom : il s'agit de la page
+  de détail d'une recette, et `Home search active-1.png` est la page 404. Ces deux
+  fichiers serviront respectivement aux étapes 4 et 5.
+- La bannière étant commune aux trois pages, `SiteHeader` a été placé en
+  `position: absolute` dans le layout racine plutôt que dans chaque page, pour éviter de
+  dupliquer le logo.
