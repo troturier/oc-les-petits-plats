@@ -28,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="bg-brand-background text-brand-black flex min-h-full flex-col font-sans">
         <SiteHeader />
-        <main className="flex-1">{children}</main>
+        <main className="flex flex-1 flex-col">{children}</main>
         <SiteFooter />
       </body>
     </html>

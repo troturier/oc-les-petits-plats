@@ -279,3 +279,52 @@ référence.
   JSON ne fournit qu'un unique champ `description` en texte continu. La description est
   donc rendue telle quelle, complétée par le nombre de personnes (`servings`), donnée
   disponible et utile qui n'apparaissait nulle part ailleurs.
+
+---
+
+## Étape 5 — Gestion de l'erreur 404
+
+### Analyse de la demande
+
+Rediriger l'utilisateur vers une page d'erreur lorsque la recette saisie dans l'URL
+n'existe pas, en créant un composant `not-found`. Résultat attendu : `recette/ma-recette`
+renvoie la page 404. Recommandation : le placement du composant détermine sa portée ; il
+est possible d'en placer un à la racine de `app` et un dans chaque sous-dossier.
+
+### Analyse de l'état du code source actuel
+
+L'appel à `notFound()` avait déjà été ajouté à l'étape 4 dans
+`app/recette/[slug]/page.tsx` — la route renvoyait donc bien un statut 404, mais avec la
+page d'erreur générique de Next.js, sans rapport avec la charte du site. Aucun fichier
+`not-found` n'existait. La maquette correspondante est `Home search active-1.png`.
+
+### Actions menées
+
+1. Création de `components/NotFoundScreen.tsx` : bannière pleine hauteur réutilisant
+   `Banner` avec un voile plus sombre (`bg-black/70`, conforme à la maquette), le code
+   « 404 :( » en jaune et un message paramétrable.
+2. Création de deux composants `not-found`, comme le suggère la recommandation :
+   - `app/not-found.tsx` (racine) — « La page que vous demandez est introuvable. » ;
+   - `app/recette/not-found.tsx` — « La recette que vous demandez est introuvable. »,
+     message plus précis pour les slugs de recette invalides.
+3. `app/layout.tsx` : passage de `<main>` en `flex flex-1 flex-col` afin que la bannière
+   404 puisse occuper toute la hauteur restante entre l'en-tête et le pied de page.
+
+### Tests effectués
+
+- `GET /recette/ma-recette` → **404**, page « La recette que vous demandez est
+  introuvable. ».
+- `GET /une-page-inexistante` → **404**, page « La page que vous demandez est
+  introuvable. ».
+- `GET /recette/poulet-coco-reunionnais` → toujours **200**.
+- Capture Chrome headless comparée à `Home search active-1.png` : mise en page conforme.
+- `npx eslint .` : aucun avertissement.
+- `npm run build` : 54 pages générées, dont les 50 recettes en SSG.
+
+### Problèmes rencontrés
+
+- La première capture de la page 404 est sortie sans l'image de fond, uniquement avec le
+  voile sombre. Fausse alerte : en mode développement l'optimiseur d'images de Next.js
+  génère le fichier à la première requête, et le budget de temps virtuel du navigateur
+  headless (8 s) expirait avant. Avec 25 s, l'image s'affiche correctement. Le rendu réel
+  n'était donc pas en cause.
