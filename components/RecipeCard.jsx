@@ -1,9 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { formatQuantity } from "@/lib/format";
-import type { Recipe } from "@/lib/types";
 
-export default function RecipeCard({ recipe }: { recipe: Recipe }) {
+/** @param {{ recipe: import("@/lib/recipes").Recipe }} props */
+export default function RecipeCard({ recipe }) {
   return (
     <Link
       href={`/recette/${recipe.slug}`}

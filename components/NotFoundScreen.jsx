@@ -1,6 +1,6 @@
 import Banner from "@/components/Banner";
 
-export default function NotFoundScreen({ message }: { message: string }) {
+export default function NotFoundScreen({ message }) {
   return (
     <Banner className="min-h-[600px] flex-1" overlayClassName="bg-black/70">
       <div className="text-center">

@@ -1,10 +1,4 @@
-export default function SelectedTag({
-  label,
-  onRemove,
-}: {
-  label: string;
-  onRemove: () => void;
-}) {
+export default function SelectedTag({ label, onRemove }) {
   return (
     <button
       type="button"

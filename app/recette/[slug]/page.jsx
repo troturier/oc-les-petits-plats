@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import Banner from "@/components/Banner";
@@ -9,9 +8,7 @@ export function generateStaticParams() {
   return getAllRecipes().map((recipe) => ({ slug: recipe.slug }));
 }
 
-export async function generateMetadata(
-  props: PageProps<"/recette/[slug]">,
-): Promise<Metadata> {
+export async function generateMetadata(props) {
   const { slug } = await props.params;
   const recipe = getRecipeBySlug(slug);
 
@@ -20,7 +17,7 @@ export async function generateMetadata(
   };
 }
 
-function SectionTitle({ children }: { children: string }) {
+function SectionTitle({ children }) {
   return (
     <h2 className="text-brand-grey mb-4 text-sm font-medium tracking-[0.09em] uppercase">
       {children}
@@ -28,7 +25,7 @@ function SectionTitle({ children }: { children: string }) {
   );
 }
 
-export default async function RecipePage(props: PageProps<"/recette/[slug]">) {
+export default async function RecipePage(props) {
   const { slug } = await props.params;
   const recipe = getRecipeBySlug(slug);
 

@@ -1,5 +1,4 @@
 import Image from "next/image";
-import type { ReactNode } from "react";
 
 /**
  * Darkened full-width image strip the logo sits on. Shared by the home page,
@@ -9,10 +8,6 @@ export default function Banner({
   className,
   overlayClassName = "bg-black/30",
   children,
-}: {
-  className?: string;
-  overlayClassName?: string;
-  children?: ReactNode;
 }) {
   return (
     <section

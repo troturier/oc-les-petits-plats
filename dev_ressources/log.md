@@ -527,5 +527,66 @@ Les sept étapes du projet sont réalisées et commitées séparément. L'applic
 - l'actualisation croisée : les sélecteurs ne proposent que les valeurs restantes, et
   recherche principale et tags se combinent.
 
-Point volontairement non traité : la persistance des critères de recherche dans l'URL,
-présentée comme optionnelle (« Allez plus loin ») dans le README.
+Point volontairement non traité à ce stade : la persistance des critères de recherche dans
+l'URL, présentée comme optionnelle (« Allez plus loin ») dans le README. Elle est traitée
+à l'étape 9.
+
+---
+
+## Étape 8 — Passage de TypeScript à JavaScript
+
+### Analyse de la demande
+
+Demande explicite : convertir le projet en JavaScript. Le README recommandait en effet de
+ne pas sélectionner TypeScript lors de l'initialisation ; le projet avait été initialisé en
+TypeScript lors de l'exécution précédente, ce choix est donc annulé.
+
+### Analyse de l'état du code source actuel
+
+23 fichiers TypeScript : 5 routes `.tsx`, 11 composants `.tsx`, 5 modules `lib/*.ts`,
+`next.config.ts` et `next-env.d.ts`, plus `tsconfig.json`. La configuration ESLint
+chargeait `eslint-config-next/typescript`, et `package.json` déclarait `typescript` et les
+trois paquets `@types/*`.
+
+Le typage n'était utilisé que pour la documentation interne (aucun générique complexe),
+la conversion est donc mécanique : suppression des annotations, des `type`/`typedef` et
+des assertions `as`.
+
+### Actions menées
+
+1. Renommage de tous les fichiers : `.tsx` → `.jsx`, `.ts` → `.js`, suppression des
+   annotations de type, des types importés et des assertions.
+2. `lib/types.ts` supprimé. Le contrat de données n'est pas perdu pour autant : les
+   formes `Recipe` et `RecipeIngredient` sont décrites en **JSDoc** dans
+   `lib/recipes.js`, et les autres modules y font référence avec
+   `import("@/lib/recipes").Recipe`. L'éditeur conserve ainsi l'autocomplétion et la
+   vérification, sans compilateur TypeScript.
+3. Les helpers de types de Next.js (`LayoutProps<"/">`, `PageProps<"/recette/[slug]">`,
+   `Metadata`) sont remplacés par de la simple déstructuration de props.
+4. `tsconfig.json` → `jsconfig.json`, qui conserve l'alias de chemin `@/*`.
+5. `next.config.ts` → `next.config.mjs` (typage conservé via le commentaire JSDoc
+   `@type {import('next').NextConfig}`).
+6. `eslint.config.mjs` : retrait de `eslint-config-next/typescript` et de l'ignore
+   `next-env.d.ts`.
+7. `package.json` : désinstallation de `typescript`, `@types/node`, `@types/react`,
+   `@types/react-dom`. Il ne reste que Next, React, Tailwind et ESLint.
+8. `.gitignore` : suppression de la section TypeScript (`*.tsbuildinfo`, `next-env.d.ts`).
+9. Suppression de `next-env.d.ts` et du cache `.next`.
+
+### Tests effectués
+
+- `npx eslint .` : aucun avertissement.
+- `npm run build` : 54 pages générées, **aucun `tsconfig.json` régénéré** — la preuve que
+  plus aucun fichier TypeScript ne subsiste dans le projet.
+- Les deux scénarios Playwright des étapes 6 et 7 rejoués tels quels sur la version
+  JavaScript : **27 contrôles sur 27 au vert**, aucune régression fonctionnelle.
+
+### Problèmes rencontrés
+
+- Première tentative de suppression en échec silencieux sur
+  `app/recette/[slug]/page.tsx` : sous PowerShell, `Remove-Item` interprète `[slug]` comme
+  une classe de caractères générique, le chemin ne correspondait donc à aucun fichier. Le
+  build suivant a détecté le `.tsx` resté en place, régénéré un `tsconfig.json` et échoué
+  sur des modules introuvables (les `.ts` voisins ayant, eux, bien été supprimés). Corrigé
+  en utilisant `Remove-Item -LiteralPath`, puis en supprimant le `tsconfig.json` et le
+  `next-env.d.ts` recréés automatiquement.

@@ -1,11 +1,10 @@
-import type { ReactNode } from "react";
 import Banner from "@/components/Banner";
 
 /**
  * Home page banner. The search bar is injected as a child so that it can stay a
  * Client Component while the banner itself is rendered on the server.
  */
-export default function Hero({ children }: { children: ReactNode }) {
+export default function Hero({ children }) {
   return (
     <Banner className="h-[667px]">
       <div className="mx-auto w-full max-w-[954px]">

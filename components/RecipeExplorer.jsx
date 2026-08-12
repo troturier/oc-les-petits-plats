@@ -14,19 +14,20 @@ import {
   collectOptions,
   filterRecipes,
   indexRecipes,
-  type FilterCategory,
-  type SelectedTags,
 } from "@/lib/search";
-import type { Recipe } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 /** Long enough to skip intermediate keystrokes, short enough to feel instant. */
 const SEARCH_DEBOUNCE_MS = 200;
 
-/** Owns the whole search state: the main search input and the advanced tags. */
-export default function RecipeExplorer({ recipes }: { recipes: Recipe[] }) {
+/**
+ * Owns the whole search state: the main search input and the advanced tags.
+ *
+ * @param {{ recipes: import("@/lib/recipes").Recipe[] }} props
+ */
+export default function RecipeExplorer({ recipes }) {
   const [query, setQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<SelectedTags>(NO_TAGS);
+  const [selectedTags, setSelectedTags] = useState(NO_TAGS);
 
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
@@ -34,7 +35,7 @@ export default function RecipeExplorer({ recipes }: { recipes: Recipe[] }) {
   const entries = useMemo(() => indexRecipes(recipes), [recipes]);
 
   const labels = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map();
 
     for (const entry of entries) {
       for (const category of FILTER_CATEGORIES) {
@@ -52,7 +53,7 @@ export default function RecipeExplorer({ recipes }: { recipes: Recipe[] }) {
     [entries, selectedTags, debouncedQuery],
   );
 
-  function toggleTag(category: FilterCategory, value: string) {
+  function toggleTag(category, value) {
     setSelectedTags((current) => {
       const values = current[category];
 

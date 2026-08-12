@@ -2,25 +2,25 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import SearchIcon from "@/components/SearchIcon";
-import { normalize, type FilterOption } from "@/lib/search";
+import { normalize } from "@/lib/search";
 
-type Props = {
-  label: string;
-  /** Options still available, already stripped of the selected ones. */
-  options: FilterOption[];
-  selectedOptions: FilterOption[];
-  onToggle: (value: string) => void;
-};
-
+/**
+ * @param {object} props
+ * @param {string} props.label
+ * @param {import("@/lib/search").FilterOption[]} props.options Options still
+ *   available, already stripped of the selected ones.
+ * @param {import("@/lib/search").FilterOption[]} props.selectedOptions
+ * @param {(value: string) => void} props.onToggle
+ */
 export default function FilterDropdown({
   label,
   options,
   selectedOptions,
   onToggle,
-}: Props) {
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
 
   // Close the panel on an outside click or on Escape.
   useEffect(() => {
@@ -28,13 +28,13 @@ export default function FilterDropdown({
       return;
     }
 
-    function handlePointerDown(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
+    function handlePointerDown(event) {
+      if (!containerRef.current?.contains(event.target)) {
         setIsOpen(false);
       }
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeyDown(event) {
       if (event.key === "Escape") {
         setIsOpen(false);
       }

@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { Anton, Manrope } from "next/font/google";
 import SiteFooter from "@/components/SiteFooter";
 import SiteHeader from "@/components/SiteHeader";
@@ -15,12 +14,12 @@ const manrope = Manrope({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Les Petits Plats",
   description: "Découvrez nos recettes du quotidien, simples et délicieuses.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }) {
   return (
     <html
       lang="fr"

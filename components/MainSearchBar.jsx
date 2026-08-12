@@ -2,12 +2,7 @@
 
 import SearchIcon from "@/components/SearchIcon";
 
-type Props = {
-  value: string;
-  onChange: (value: string) => void;
-};
-
-export default function MainSearchBar({ value, onChange }: Props) {
+export default function MainSearchBar({ value, onChange }) {
   return (
     <search className="block w-full">
       <div className="relative">

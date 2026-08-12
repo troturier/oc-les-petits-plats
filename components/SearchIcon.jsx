@@ -1,4 +1,4 @@
-export default function SearchIcon({ className }: { className?: string }) {
+export default function SearchIcon({ className }) {
   return (
     <svg
       viewBox="0 0 24 24"
