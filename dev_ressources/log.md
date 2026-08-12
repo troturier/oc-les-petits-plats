@@ -420,3 +420,112 @@ Captures comparées aux maquettes `Components.png` (sélecteur ouvert avec « co
 - Premier jet des boutons de suppression : le libellé « Retirer le filtre » était un
   `<span class="sr-only">` juxtaposé, ce qui allongeait le nom accessible du bouton. Il a
   été remplacé par un `aria-label` explicite.
+
+---
+
+## Étape 7 — Recherche principale
+
+### Analyse de la demande
+
+Analyser l'entrée utilisateur dans plusieurs champs (titre, ingrédients, description).
+Recommandations : noter les critères de réussite, identifier tous les champs concernés, ne
+lancer la recherche qu'à partir de 3 caractères. Points de vigilance : gérer les
+majuscules et les accents oubliés, et limiter la fréquence d'exécution avec un
+« debounce ».
+
+Critères retenus, issus de la fiche « Cas d'utilisation #03 » :
+
+1. la recherche porte sur **le titre, la liste des ingrédients et la description** ;
+2. elle se déclenche à partir de **3 caractères** et s'actualise à chaque caractère ;
+3. elle est insensible à la casse et aux accents ;
+4. les champs de recherche avancée se recalculent sur les recettes restantes ;
+5. sans résultat, l'interface affiche « Aucune recette ne contient "XXX" vous pouvez
+   chercher « tarte aux pommes », « poisson », etc. » (scénario alternatif A1) ;
+6. recherche principale et tags se combinent.
+
+### Analyse de l'état du code source actuel
+
+`MainSearchBar` était encore un champ non contrôlé et purement décoratif. `filterRecipes`
+ne traitait que les tags, et `RecipeExplorer` ne détenait pas d'état de saisie. Toute
+l'infrastructure (index normalisé, mémoïsation, calcul des options à partir des résultats)
+mise en place à l'étape 6 était en revanche directement réutilisable.
+
+### Actions menées
+
+1. **`lib/search.ts`** :
+   - ajout de `MIN_QUERY_LENGTH = 3` ;
+   - ajout d'un champ `haystack` à l'index : titre, ingrédients et description normalisés
+     et concaténés une seule fois, séparés par ` | ` pour qu'une correspondance ne puisse
+     pas chevaucher deux champs ;
+   - `filterRecipes()` accepte désormais une `query` : en dessous de 3 caractères elle est
+     ignorée, au-delà elle est normalisée puis recherchée dans le `haystack`. Les tags
+     continuent de s'appliquer, la recherche textuelle et les tags se cumulent donc.
+2. **`lib/useDebouncedValue.ts`** : hook générique qui ne renvoie la valeur qu'après
+   200 ms de stabilité.
+3. **`components/MainSearchBar.tsx`** : champ contrôlé (`value` / `onChange`) avec un
+   bouton d'effacement affiché dès que la saisie n'est pas vide, comme sur `Components.png`.
+4. **`components/RecipeExplorer.tsx`** : état `query`, valeur débouncée passée au moteur,
+   et bloc de résultat vide affichant le message du scénario A1 avec le terme recherché
+   (ou un message générique si aucun résultat ne provient d'une recherche textuelle).
+
+### Choix d'implémentation
+
+- **Algorithme** : recherche de sous-chaîne sur une chaîne pré-normalisée par recette.
+  Le coût par frappe est donc 50 `String.includes` sur des chaînes déjà en minuscules et
+  sans accents : la normalisation, qui est la partie coûteuse, n'est faite qu'une fois au
+  chargement. Cela répond à la règle 4 (« afficher les premiers résultats le plus
+  rapidement possible ») sans recourir à une structure de données plus complexe, qui
+  serait démesurée pour 50 recettes.
+- **Délai de debounce** : 200 ms. Assez long pour absorber une frappe rapide, assez court
+  pour que la liste paraisse réagir immédiatement.
+- **Valeur affichée / valeur filtrée** : le champ reste piloté par `query` (aucune latence
+  de saisie visible), seul le filtrage utilise `debouncedQuery`.
+
+### Tests effectués
+
+Scénario Playwright dédié, exécuté sur `http://localhost:3000/`. Tous les points au vert :
+
+| Vérification                                                        | Résultat                             |
+| ------------------------------------------------------------------- | ------------------------------------ |
+| 50 recettes au chargement                                            | OK                                   |
+| 2 caractères (« co ») ne filtrent pas                                | 50 recettes                          |
+| 3 caractères (« coc ») déclenchent la recherche                      | 6 recettes                           |
+| Recherche dans le **titre** (« Tarte aux pommes »)                   | Tarte aux pommes                     |
+| Recherche dans les **ingrédients** (« macaronis », absent des titres et des descriptions) | Salade de pâtes |
+| Recherche dans la **description** (« blender »)                      | 4 recettes                           |
+| Insensibilité casse + accents (« CRÈME » vs « creme »)               | 16 = 16                              |
+| Aucun résultat (« zzzzz ») → message A1 citant le terme              | message conforme                     |
+| Bouton d'effacement                                                  | retour à 50 recettes                 |
+| Sélecteurs recalculés après recherche (« chocolat »)                 | 8 recettes → Casserole, Four, Moule à charlotte, Poêle à crêpe |
+| Combinaison recherche principale + tag                               | 2 recettes                           |
+| Debounce (8 frappes à 40 ms d'intervalle)                            | 1 seule mise à jour de la grille     |
+| Erreurs dans la console du navigateur                                | aucune                               |
+
+Autres contrôles : `npx tsc --noEmit`, `npx eslint .` et `npm run build` (54 pages
+générées) passent sans erreur ni avertissement.
+
+### Problèmes rencontrés
+
+- Premier test « recherche dans les ingrédients » en échec avec le terme « poireau » :
+  faux négatif du test, pas du code — la recette « Soupe de poireaux » contient le mot
+  dans son titre, la correspondance pouvait donc venir du titre. Le terme a été remplacé
+  par « macaronis », vérifié absent de tous les titres et de toutes les descriptions du
+  jeu de données, ce qui prouve que la correspondance vient bien des ingrédients.
+
+---
+
+## Bilan
+
+Les sept étapes du projet sont réalisées et commitées séparément. L'application couvre :
+
+- la page d'accueil conforme aux maquettes, avec les 50 recettes ;
+- la page de détail d'une recette sur `/recette/{slug}`, prégénérée pour les 50 recettes ;
+- deux pages 404 personnalisées ;
+- la recherche par tags (ingrédients, appareils, ustensiles) en intersection ;
+- la recherche principale sur titre, ingrédients et description, à partir de 3 caractères,
+  insensible à la casse et aux accents, avec debounce ;
+- l'actualisation croisée : les sélecteurs ne proposent que les valeurs restantes, et
+  recherche principale et tags se combinent.
+
+Point volontairement non traité : la persistance des critères de recherche dans l'URL,
+présentée comme optionnelle (« Allez plus loin ») dans le README.

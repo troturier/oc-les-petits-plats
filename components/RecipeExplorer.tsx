@@ -9,6 +9,7 @@ import SelectedTag from "@/components/SelectedTag";
 import {
   CATEGORY_LABELS,
   FILTER_CATEGORIES,
+  MIN_QUERY_LENGTH,
   NO_TAGS,
   collectOptions,
   filterRecipes,
@@ -17,13 +18,17 @@ import {
   type SelectedTags,
 } from "@/lib/search";
 import type { Recipe } from "@/lib/types";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
-/**
- * Owns the whole search state: the advanced-search tags for now, the main
- * search input from step 7 on.
- */
+/** Long enough to skip intermediate keystrokes, short enough to feel instant. */
+const SEARCH_DEBOUNCE_MS = 200;
+
+/** Owns the whole search state: the main search input and the advanced tags. */
 export default function RecipeExplorer({ recipes }: { recipes: Recipe[] }) {
+  const [query, setQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<SelectedTags>(NO_TAGS);
+
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   // Normalizing the dataset once keeps every later keystroke cheap.
   const entries = useMemo(() => indexRecipes(recipes), [recipes]);
@@ -43,8 +48,8 @@ export default function RecipeExplorer({ recipes }: { recipes: Recipe[] }) {
   }, [entries]);
 
   const results = useMemo(
-    () => filterRecipes(entries, selectedTags),
-    [entries, selectedTags],
+    () => filterRecipes(entries, selectedTags, debouncedQuery),
+    [entries, selectedTags, debouncedQuery],
   );
 
   function toggleTag(category: FilterCategory, value: string) {
@@ -67,7 +72,7 @@ export default function RecipeExplorer({ recipes }: { recipes: Recipe[] }) {
   return (
     <>
       <Hero>
-        <MainSearchBar />
+        <MainSearchBar value={query} onChange={setQuery} />
       </Hero>
 
       <div className="mx-auto w-full max-w-[1236px] px-6 py-[60px]">
@@ -113,11 +118,19 @@ export default function RecipeExplorer({ recipes }: { recipes: Recipe[] }) {
           </p>
         </div>
 
-        <div className="mt-[60px] grid gap-x-12 gap-y-[66px] md:grid-cols-2 xl:grid-cols-3">
-          {results.map(({ recipe }) => (
-            <RecipeCard key={recipe.id} recipe={recipe} />
-          ))}
-        </div>
+        {results.length === 0 ? (
+          <p className="mt-[60px] max-w-[720px] text-lg">
+            {debouncedQuery.trim().length >= MIN_QUERY_LENGTH
+              ? `Aucune recette ne contient « ${debouncedQuery.trim()} » vous pouvez chercher « tarte aux pommes », « poisson », etc.`
+              : "Aucune recette ne correspond aux filtres sélectionnés."}
+          </p>
+        ) : (
+          <div className="mt-[60px] grid gap-x-12 gap-y-[66px] md:grid-cols-2 xl:grid-cols-3">
+            {results.map(({ recipe }) => (
+              <RecipeCard key={recipe.id} recipe={recipe} />
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

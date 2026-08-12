@@ -17,6 +17,9 @@ export const NO_TAGS: SelectedTags = {
   ustensils: [],
 };
 
+/** The main search bar only starts filtering from this many characters. */
+export const MIN_QUERY_LENGTH = 3;
+
 export const CATEGORY_LABELS: Record<FilterCategory, string> = {
   ingredients: "Ingrédients",
   appliances: "Appareils",
@@ -57,12 +60,25 @@ function toOption(value: string): FilterOption {
  */
 export type IndexedRecipe = {
   recipe: Recipe;
+  /**
+   * Name, ingredients and description of the recipe, normalized and joined
+   * together: the three fields the main search bar looks into. The separator
+   * prevents a match from spanning two fields.
+   */
+  haystack: string;
   tags: Record<FilterCategory, FilterOption[]>;
 };
 
 export function indexRecipes(recipes: Recipe[]): IndexedRecipe[] {
   return recipes.map((recipe) => ({
     recipe,
+    haystack: [
+      recipe.name,
+      ...recipe.ingredients.map((item) => item.ingredient),
+      recipe.description,
+    ]
+      .map(normalize)
+      .join(" | "),
     tags: {
       ingredients: recipe.ingredients.map((item) => toOption(item.ingredient)),
       appliances: [toOption(recipe.appliance)],
@@ -71,17 +87,26 @@ export function indexRecipes(recipes: Recipe[]): IndexedRecipe[] {
   }));
 }
 
-/** Keeps the recipes carrying *every* selected tag (intersection). */
+/**
+ * Keeps the recipes matching the main search *and* carrying **every** selected
+ * tag (intersection). A query shorter than `MIN_QUERY_LENGTH` is ignored.
+ */
 export function filterRecipes(
   entries: IndexedRecipe[],
   tags: SelectedTags,
+  query = "",
 ): IndexedRecipe[] {
-  return entries.filter((entry) =>
-    FILTER_CATEGORIES.every((category) =>
-      tags[category].every((tag) =>
-        entry.tags[category].some((option) => option.value === tag),
+  const search = normalize(query);
+  const searchesText = search.length >= MIN_QUERY_LENGTH;
+
+  return entries.filter(
+    (entry) =>
+      (!searchesText || entry.haystack.includes(search)) &&
+      FILTER_CATEGORIES.every((category) =>
+        tags[category].every((tag) =>
+          entry.tags[category].some((option) => option.value === tag),
+        ),
       ),
-    ),
   );
 }
 
