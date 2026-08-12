@@ -328,3 +328,95 @@ page d'erreur générique de Next.js, sans rapport avec la charte du site. Aucun
   génère le fichier à la première requête, et le budget de temps virtuel du navigateur
   headless (8 s) expirait avant. Avec 25 s, l'image s'affiche correctement. Le rendu réel
   n'était donc pas en cause.
+
+---
+
+## Étape 6 — Recherche par tags
+
+### Analyse de la demande
+
+Récupérer les tags des recettes, garantir leur unicité, les afficher dans leur liste
+respective et rendre la sélection fonctionnelle. Résultats attendus : recherche à
+l'intérieur de chaque champ de tag, tag sélectionné affiché dans la liste des tags
+sélectionnés et retiré de la liste des tags disponibles, liste des recettes actualisée,
+listes de tags actualisées en fonction des recettes disponibles.
+
+La fiche « Cas d'utilisation #03 » précise en outre :
+- règle 5 : les champs ne proposent que les éléments restant dans les recettes affichées ;
+- règle 6 : les résultats sont une **intersection** (« coco » ET « chocolat ») ;
+- règle 8 : aucune librairie pour le moteur de recherche.
+
+### Analyse de l'état du code source actuel
+
+`FilterDropdown` n'était qu'un bouton décoratif, sans état ni options. Aucune logique de
+recherche n'existait. `app/page.tsx` était un Server Component qui affichait directement
+la totalité des recettes ; la recherche a besoin d'un état client partagé entre la barre
+de recherche (dans la bannière) et la grille de résultats.
+
+### Actions menées
+
+1. **`lib/search.ts`** — moteur de recherche, écrit sans aucune dépendance :
+   - `normalize()` : passage en minuscules et suppression des accents via
+     `normalize("NFD")` puis retrait du bloc de diacritiques combinantes, pour que
+     « Crème de Coco » et « creme de coco » soient équivalents ;
+   - `indexRecipes()` : chaque recette est normalisée **une seule fois** en un index
+     `{ recipe, tags: { ingredients, appliances, ustensils } }`, afin que le filtrage
+     n'ait rien à recalculer à chaque frappe ;
+   - `filterRecipes()` : conserve les recettes portant **tous** les tags sélectionnés,
+     ce qui implémente l'intersection de la règle 6 ;
+   - `collectOptions()` : construit la liste d'un sélecteur à partir des recettes
+     **actuellement affichées** (règle 5), dédoublonne par valeur normalisée, retire les
+     tags déjà sélectionnés (point de vigilance) et trie avec `localeCompare(…, "fr")`.
+2. **`components/RecipeExplorer.tsx`** (Client Component) — chef d'orchestre : détient
+   l'état `selectedTags`, mémoïse l'index, calcule les résultats et les options, puis
+   rend la bannière, les sélecteurs, les tags sélectionnés, le compteur et la grille.
+3. **`components/FilterDropdown.tsx`** — sélecteur devenu interactif : ouverture /
+   fermeture, champ de recherche interne filtrant les options (scénario nominal, point 6),
+   tags sélectionnés épinglés en jaune en haut de la liste avec une croix, fermeture au
+   clic extérieur et à la touche `Échap`.
+4. **`components/SelectedTag.tsx`** — pastille jaune affichée sous les sélecteurs.
+5. **`app/page.tsx`** — réduit à la lecture des données et au rendu de `RecipeExplorer`.
+
+### Choix d'implémentation
+
+- **Identité des tags** : la valeur normalisée sert de clé et de critère de comparaison,
+  tandis qu'un libellé unifié (minuscules + initiale capitalisée) est affiché. Le jeu de
+  données mélange en effet les casses (`couteau` / `Couteau`, `Lait de coco` /
+  `Lait de Coco`) ; sans cela, le même tag apparaîtrait plusieurs fois dans la liste.
+- **Persistance dans l'URL** : proposée en option (« Allez plus loin ») dans le README,
+  elle n'a pas été implémentée afin de ne pas ajouter de fonctionnalité non demandée.
+
+### Tests effectués
+
+Un scénario Playwright (exécuté hors du dépôt, dans le dossier temporaire de travail)
+pilote un vrai navigateur sur `http://localhost:3000/`. Tous les points sont au vert :
+
+| Vérification                                                              | Résultat            |
+| ------------------------------------------------------------------------- | ------------------- |
+| 50 recettes et compteur « 50 recettes » au chargement                      | OK                  |
+| Liste « Ingrédients » alimentée                                            | 121 options         |
+| Saisie de « coco » dans le champ                                           | Crème de coco, Lait de coco |
+| Sélection de « Lait de coco » → filtrage des recettes                      | 3 recettes          |
+| Compteur synchronisé avec les résultats                                    | OK                  |
+| Tag sélectionné retiré de la liste des disponibles (épinglé une seule fois) | OK                  |
+| Fermeture du panneau avec `Échap`                                          | OK                  |
+| Pastille jaune du tag sélectionné affichée                                 | OK                  |
+| Liste « Appareils » restreinte aux recettes restantes                      | Blender, Cocotte, Saladier |
+| Intersection de deux tags                                                  | 1 recette           |
+| Retrait d'un tag → élargissement des résultats                             | OK                  |
+| Erreurs dans la console du navigateur                                      | aucune              |
+
+Captures comparées aux maquettes `Components.png` (sélecteur ouvert avec « coco ») et
+`Home-1.png` (pastille jaune sous les sélecteurs) : rendu conforme.
+`npx tsc --noEmit` et `npx eslint .` : aucune erreur.
+
+### Problèmes rencontrés
+
+- Aucune librairie n'étant autorisée pour le moteur de recherche (règle 8), tout est
+  écrit en JavaScript natif ; Playwright n'est utilisé que pour **tester**, en dehors du
+  dépôt, et n'est donc pas une dépendance du projet.
+- Le motif regex `\p{Diacritic}` échoue à la compilation avec la cible `ES2017` du
+  `tsconfig.json`. Le bloc de diacritiques combinantes est donc écrit explicitement.
+- Premier jet des boutons de suppression : le libellé « Retirer le filtre » était un
+  `<span class="sr-only">` juxtaposé, ce qui allongeait le nom accessible du bouton. Il a
+  été remplacé par un `aria-label` explicite.
