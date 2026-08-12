@@ -165,3 +165,55 @@ Component alors que la barre deviendra un Client Component à l'étape 7.
 - La bannière étant commune aux trois pages, `SiteHeader` a été placé en
   `position: absolute` dans le layout racine plutôt que dans chaque page, pour éviter de
   dupliquer le logo.
+
+---
+
+## Étape 3 — Affichage des recettes
+
+### Analyse de la demande
+
+Importer le fichier JSON dans la page et boucler sur les recettes pour alimenter la carte
+créée à l'étape 2. Résultat attendu : les 50 recettes s'affichent. Point de vigilance :
+aucun avertissement dans la console (typiquement l'avertissement React sur les `key`).
+
+### Analyse de l'état du code source actuel
+
+`app/page.tsx` affichait une unique recette codée en dur. `RecipeCard` était déjà typé
+avec `Recipe`, il ne restait donc qu'à fournir la vraie source de données.
+
+### Actions menées
+
+1. Création de `lib/recipes.ts`, point d'accès unique aux données : import de
+   `data/recipes.json` (activé par `resolveJsonModule`), typage en `Recipe[]` et deux
+   fonctions `getAllRecipes()` / `getRecipeBySlug()`. `getRecipeBySlug` est déjà présente
+   ici car elle sera consommée par la page de recette à l'étape 4.
+2. `app/page.tsx` : suppression de la recette statique, appel à `getAllRecipes()`, boucle
+   `map()` sur les recettes avec `key={recipe.id}`, et compteur dynamique accordé en
+   nombre (`1 recette` / `50 recettes`).
+
+### Prévention des avertissements de console
+
+- Clé de la liste de recettes : `recipe.id`, unique par construction (vérifié : 50 `id`
+  distincts).
+- Clé des ingrédients dans la carte : `ingredient.ingredient`. Vérification préalable
+  effectuée sur le jeu de données — aucune recette ne répète deux fois le même nom
+  d'ingrédient, ni le même ustensile.
+
+### Tests effectués
+
+- `npx tsc --noEmit` : aucune erreur (le `as Recipe[]` est accepté, `quantity` étant typé
+  `number | string | undefined`).
+- `npx eslint .` : aucun avertissement.
+- Requête HTTP sur `http://localhost:3000/` : 50 balises `<article>` présentes dans le
+  HTML rendu côté serveur et compteur affichant « 50 recettes ».
+- Capture Chrome headless comparée à `Home.png` : grille de trois colonnes, badges de
+  temps, ingrédients sur deux colonnes conformes.
+- Journal du serveur de développement inspecté (`Warning`, `Error`, `key`) : aucune
+  occurrence, le rendu serveur ne produit donc aucun avertissement React.
+
+### Problèmes rencontrés
+
+Aucun. Seule remarque : la maquette prévoit six emplacements d'ingrédients par carte
+(le sixième étant masqué quand il n'existe pas), alors que le composant affiche
+l'intégralité des ingrédients de la recette — comportement volontairement conservé
+puisqu'il évite de masquer de l'information.
