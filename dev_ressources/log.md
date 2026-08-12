@@ -691,3 +691,29 @@ Les deux scénarios des étapes 6 et 7 ont été rejoués : aucune régression
   `URLSearchParams` encode les espaces en `+`, que `decodeURIComponent` ne reconvertit
   pas. Les URL produites par l'application (`?ingredients=lait+de+coco`) étaient
   correctes ; c'est le comparateur du scénario qui a été corrigé.
+
+---
+
+## Livrables de présentation
+
+Deux documents de restitution ont été produits à la demande, en dehors du code :
+
+- `dev_ressources/presentation.pptx` — 20 diapositives (contexte, ressources, stack,
+  architecture, les 7 étapes une par une, zoom sur le moteur de recherche, persistance
+  dans l'URL, conformité aux 8 règles de gestion, stratégie de tests, traçabilité, bilan),
+  chacune accompagnée de notes de présentation détaillées (2 900 mots au total).
+- `dev_ressources/presentation.docx` — 21 pages reprenant le même plan sous forme
+  rédigée, avec un sommaire et une page par section.
+
+Les deux documents illustrent le propos avec les captures d'écran réelles de
+l'application (accueil, page de recette, page 404, sélecteur ouvert, message d'absence
+de résultat) et ne présentent que la version JavaScript du projet.
+
+Contrôle du rendu : les diapositives ont été exportées en images via PowerPoint et le
+document Word en PDF, puis relus pour vérifier la mise en page. Trois corrections ont
+suivi cette relecture — une image qui débordait sur le pied de page, un encadré de code
+surdimensionné pour une seule ligne, et une section Word qui débordait de deux lignes sur
+une page supplémentaire.
+
+À noter : ces deux fichiers ne sont pas versionnés, `.gitignore` excluant l'intégralité
+du dossier `dev_ressources/` à l'exception du présent journal.
