@@ -217,3 +217,65 @@ Aucun. Seule remarque : la maquette prévoit six emplacements d'ingrédients par
 (le sixième étant masqué quand il n'existe pas), alors que le composant affiche
 l'intégralité des ingrédients de la recette — comportement volontairement conservé
 puisqu'il évite de masquer de l'information.
+
+---
+
+## Étape 4 — Page de recette
+
+### Analyse de la demande
+
+Créer une route dynamique permettant d'afficher une recette, récupérer la recette via les
+`params` et intégrer la page d'après la maquette. Résultat attendu : l'URL
+`/recette/poisson-cru-a-la-tahitienne` affiche la bonne page. Recommandation : créer un
+dossier `recette` avant le dossier de route dynamique. Point de vigilance : gérer les cas
+d'erreur lorsque l'URL est saisie manuellement.
+
+### Analyse de l'état du code source actuel
+
+Le projet ne comportait qu'une seule route (`/`). `getRecipeBySlug()` avait déjà été
+créée à l'étape 3 mais n'était consommée nulle part. Les cartes de recette n'étaient pas
+cliquables. La bannière était codée directement dans `Hero`, or la page de recette en a
+besoin dans une version réduite en hauteur.
+
+Point important sur la maquette : le fichier nommé `Home search active.png` est en
+réalité la maquette de la page de détail d'une recette. C'est donc elle qui a servi de
+référence.
+
+### Actions menées
+
+1. Extraction d'un composant `components/Banner.tsx` (image, voile sombre, contenu
+   optionnel), et réécriture de `Hero` pour s'appuyer dessus. La page de recette utilise
+   le même composant avec `h-[120px]`, conformément à la maquette.
+2. Création de la route `app/recette/[slug]/page.tsx` :
+   - `const { slug } = await props.params` — dans Next.js 16 les `params` sont une
+     promesse, ils doivent être attendus ;
+   - typage par le helper global `PageProps<"/recette/[slug]">` généré par Next.js ;
+   - `generateStaticParams()` : les 50 recettes sont prérendues à la compilation ;
+   - `generateMetadata()` : le titre de l'onglet reprend le nom de la recette ;
+   - mise en page deux colonnes (visuel carré à gauche, contenu à droite) avec les
+     sections Temps de préparation / Ingrédients / Ustensiles nécessaires / Appareils
+     nécessaires / Recette, dans l'ordre de la maquette.
+3. `RecipeCard` : la carte entière est désormais enveloppée dans un `<Link>` vers
+   `/recette/{slug}`, avec un anneau de focus visible au clavier.
+4. Gestion du cas d'erreur : appel à `notFound()` de `next/navigation` lorsque le slug ne
+   correspond à aucune recette. La page 404 personnalisée est traitée à l'étape 5.
+
+### Tests effectués
+
+- `npx tsc --noEmit` et `npx eslint .` : aucune erreur.
+- `GET /recette/poulet-coco-reunionnais` → **200**.
+- `GET /recette/ma-recette` (slug inexistant) → **404**.
+- Capture Chrome headless comparée à `Home search active.png` : bandeau court avec logo,
+  visuel carré, titre, badge jaune de temps, ingrédients sur trois colonnes, ustensiles,
+  appareil et description — rendu conforme.
+
+### Problèmes rencontrés
+
+- Le nom trompeur de la maquette (`Home search active.png` pour la page recette) a
+  nécessité d'ouvrir chaque PNG pour identifier son contenu réel.
+- La maquette affiche une quantité sous chaque ustensile (« Couteau / 1 »), information
+  absente du JSON : seul le libellé de l'ustensile est donc affiché.
+- La maquette présente la recette sous forme de liste d'étapes numérotées, alors que le
+  JSON ne fournit qu'un unique champ `description` en texte continu. La description est
+  donc rendue telle quelle, complétée par le nombre de personnes (`servings`), donnée
+  disponible et utile qui n'apparaissait nulle part ailleurs.
